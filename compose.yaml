@@ -1,0 +1,42 @@
+services:
+  bridge:
+    build:
+      context: .
+    image: telegram-mattermost-bridge:local
+    env_file:
+      - .env
+    command: ["run"]
+    restart: unless-stopped
+    init: true
+    cpus: 1.0
+    mem_limit: 512m
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - bridge_data:/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  bridge_data:
