@@ -65,7 +65,7 @@ func TestSendUsesCompactAuthorAndOverrideProps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if posted["message"] != "*Антон: *Спасибо" || sent.MessageID != "mm1" {
+	if posted["message"] != "*Антон:* Спасибо" || sent.MessageID != "mm1" {
 		t.Fatalf("posted %#v sent %#v", posted, sent)
 	}
 	props := posted["props"].(map[string]any)

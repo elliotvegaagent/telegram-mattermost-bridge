@@ -14,7 +14,7 @@ func TestRenderUsesCompactAuthorFormat(t *testing.T) {
 		t.Fatalf("unexpected Telegram text: %q", got)
 	}
 	tg := model.Event{Platform: model.Telegram, Kind: model.Message, AuthorName: "Антон", Text: "Спасибо"}
-	if got := Render(tg, model.Mattermost, "", true); got != "*Антон: *Спасибо" {
+	if got := Render(tg, model.Mattermost, "", true); got != "*Антон:* Спасибо" {
 		t.Fatalf("unexpected Mattermost text: %q", got)
 	}
 }
@@ -27,7 +27,7 @@ func TestRenderNeutralizesMattermostMentionsAndMarkdown(t *testing.T) {
 			t.Fatalf("mention was not neutralized: %q", got)
 		}
 	}
-	if !strings.HasPrefix(got, "*Ан\\*тон @\u200ball: *") {
+	if !strings.HasPrefix(got, "*Ан\\*тон @\u200ball:* ") {
 		t.Fatalf("author was not safely italicized: %q", got)
 	}
 	if !strings.Contains(got, "\\*важно\\*") {

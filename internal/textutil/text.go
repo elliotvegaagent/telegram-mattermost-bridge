@@ -60,7 +60,7 @@ func Render(event model.Event, target model.Platform, unknownQuote string, inclu
 		if body == "" {
 			return "*" + author + "*"
 		}
-		return "*" + author + ": *" + escapeMattermost(body)
+		return "*" + author + ":* " + escapeMattermost(body)
 	} else if includeAuthor {
 		result = strings.TrimSpace(AuthorLabel(event) + "\n" + body)
 	} else {
