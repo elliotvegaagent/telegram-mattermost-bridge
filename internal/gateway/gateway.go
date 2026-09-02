@@ -295,7 +295,7 @@ func (g *Gateway) resolveContext(ctx context.Context, event model.Event) (model.
 		result.EditTargetID = existing.TGMessageID
 	}
 	if event.Kind == model.Delete {
-		links, err := g.store.FindAllByMM(ctx, event.MessageID)
+		links, err := g.store.FindTelegramDeleteTargetsByMM(ctx, event.MessageID)
 		if err != nil {
 			return model.DeliveryContext{}, err
 		}

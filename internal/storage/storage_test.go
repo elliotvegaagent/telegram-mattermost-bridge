@@ -67,15 +67,15 @@ func TestMessageLinksAndReactionAggregation(t *testing.T) {
 	if err := store.AddLink(ctx, model.MessageLink{MMPostID: "mm1", TGChatID: -100, TGMessageID: "11", MMRootID: "mm1", TGAnchorMessageID: "10", PartIndex: 1}); err != nil {
 		t.Fatal(err)
 	}
-	links, err := store.FindAllByMM(ctx, "mm1")
-	if err != nil || len(links) != 2 || links[0].TGMessageID != "10" || links[1].TGMessageID != "11" {
-		t.Fatalf("links %#v %v", links, err)
-	}
 	for i, emoji := range []string{"👍", "🔥"} {
 		event := model.Event{EventID: "r" + string(rune('0'+i)), Platform: model.Telegram, Kind: model.ReactionAdded, MessageID: "10", MessageIDs: []string{"10"}, AuthorID: "u" + string(rune('0'+i)), AuthorName: "A", RouteID: "default", Reaction: emoji, CreatedAtMS: int64(i + 1)}
 		if _, err := store.Enqueue(ctx, event); err != nil {
 			t.Fatal(err)
 		}
+	}
+	links, err := store.FindTelegramDeleteTargetsByMM(ctx, "mm1")
+	if err != nil || len(links) != 1 || links[0].TGMessageID != "11" {
+		t.Fatalf("bridge-owned links %#v %v", links, err)
 	}
 	got, err := store.ActiveReactions(ctx, model.Telegram, "default", "10")
 	if err != nil || len(got) != 2 || got[1] != "🔥" {

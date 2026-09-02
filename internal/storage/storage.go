@@ -297,8 +297,8 @@ func (s *Store) FindByMM(ctx context.Context, postID string) (*model.MessageLink
 	return s.findLink(ctx, "SELECT mm_post_id,tg_chat_id,tg_message_id,mm_root_id,tg_anchor_message_id,part_index FROM message_links WHERE mm_post_id=? ORDER BY part_index,id LIMIT 1", postID)
 }
 
-func (s *Store) FindAllByMM(ctx context.Context, postID string) ([]model.MessageLink, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT mm_post_id,tg_chat_id,tg_message_id,mm_root_id,tg_anchor_message_id,part_index FROM message_links WHERE mm_post_id=? ORDER BY part_index,id", postID)
+func (s *Store) FindTelegramDeleteTargetsByMM(ctx context.Context, postID string) ([]model.MessageLink, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT l.mm_post_id,l.tg_chat_id,l.tg_message_id,l.mm_root_id,l.tg_anchor_message_id,l.part_index FROM message_links l WHERE l.mm_post_id=? AND NOT EXISTS (SELECT 1 FROM inbox_events i WHERE i.source='telegram' AND i.source_message_id=l.tg_message_id) ORDER BY l.part_index,l.id", postID)
 	if err != nil {
 		return nil, err
 	}
