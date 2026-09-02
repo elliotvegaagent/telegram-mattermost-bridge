@@ -56,17 +56,25 @@ func Render(event model.Event, target model.Platform, unknownQuote string, inclu
 	if includeAuthor && event.Platform == model.Mattermost && target == model.Telegram {
 		result = strings.TrimRight(event.AuthorName+": "+body, ": ")
 	} else if includeAuthor && event.Platform == model.Telegram && target == model.Mattermost {
-		result = strings.TrimRight(event.AuthorName+": "+body, ": ")
+		author := escapeMattermost(event.AuthorName)
+		if body == "" {
+			return "*" + author + "*"
+		}
+		return "*" + author + ": *" + escapeMattermost(body)
 	} else if includeAuthor {
 		result = strings.TrimSpace(AuthorLabel(event) + "\n" + body)
 	} else {
 		result = body
 	}
 	if target == model.Mattermost {
-		result = mmMarkdown.ReplaceAllString(result, `\$1`)
-		result = mmMention.ReplaceAllString(result, "@\u200b$1")
+		result = escapeMattermost(result)
 	}
 	return result
+}
+
+func escapeMattermost(value string) string {
+	value = mmMarkdown.ReplaceAllString(value, `\$1`)
+	return mmMention.ReplaceAllString(value, "@\u200b$1")
 }
 
 func Split(value string, limit int) []string {
