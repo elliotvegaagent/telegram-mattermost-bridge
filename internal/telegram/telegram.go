@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/elliotvegaagent/telegram-mattermost-bridge/internal/config"
 	"github.com/elliotvegaagent/telegram-mattermost-bridge/internal/model"
@@ -65,6 +66,12 @@ type tgEnvelope struct {
 	Parameters  struct {
 		RetryAfter int `json:"retry_after"`
 	} `json:"parameters"`
+}
+
+type messageEntity struct {
+	Type   string `json:"type"`
+	Offset int    `json:"offset"`
+	Length int    `json:"length"`
 }
 
 func (a *Adapter) requestForm(ctx context.Context, method string, values url.Values, timeout time.Duration, target any) error {
@@ -591,6 +598,9 @@ func (a *Adapter) Send(ctx context.Context, event model.Event, delivery model.De
 			for key, value := range fields {
 				values.Set(key, value)
 			}
+			if i == 0 && event.Platform == model.Mattermost {
+				addItalicAuthorEntity(values, item.text, event.AuthorName)
+			}
 			err = a.requestForm(ctx, item.method, values, 40*time.Second, &result)
 		} else {
 			fieldName := "document"
@@ -636,7 +646,11 @@ func (a *Adapter) Edit(ctx context.Context, event model.Event, targetID string) 
 	if len([]rune(text)) > 4096 {
 		return model.Permanent("edited message exceeds Telegram text limit")
 	}
-	return a.requestForm(ctx, "editMessageText", url.Values{"chat_id": {strconv.FormatInt(chatID, 10)}, "message_id": {targetID}, "text": {text}}, 20*time.Second, nil)
+	values := url.Values{"chat_id": {strconv.FormatInt(chatID, 10)}, "message_id": {targetID}, "text": {text}}
+	if event.Platform == model.Mattermost {
+		addItalicAuthorEntity(values, text, event.AuthorName)
+	}
+	return a.requestForm(ctx, "editMessageText", values, 20*time.Second, nil)
 }
 func (a *Adapter) AcknowledgeDelivery(context.Context, model.Event) error { return nil }
 func (a *Adapter) SyncReactions(ctx context.Context, event model.Event, targetID string, reactions []string) error {
@@ -743,3 +757,26 @@ func minDuration(a, b time.Duration) time.Duration {
 	return b
 }
 func errorsAs(err error, target any) bool { return errors.As(err, target) }
+
+func addItalicAuthorEntity(values url.Values, text, author string) {
+	if author == "" {
+		return
+	}
+	byteOffset := strings.Index(text, author)
+	if byteOffset < 0 {
+		return
+	}
+	afterAuthor := byteOffset + len(author)
+	if afterAuthor < len(text) && text[afterAuthor] != '\n' {
+		return
+	}
+	entities := []messageEntity{{
+		Type:   "italic",
+		Offset: len(utf16.Encode([]rune(text[:byteOffset]))),
+		Length: len(utf16.Encode([]rune(author))),
+	}}
+	payload, err := json.Marshal(entities)
+	if err == nil {
+		values.Set("entities", string(payload))
+	}
+}

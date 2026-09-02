@@ -1,6 +1,8 @@
 package telegram
 
 import (
+	"encoding/json"
+	"net/url"
 	"testing"
 
 	"github.com/elliotvegaagent/telegram-mattermost-bridge/internal/config"
@@ -47,3 +49,15 @@ func TestNormalizeBasicReaction(t *testing.T) {
 	}
 }
 func intPtr(v int64) *int64 { return &v }
+
+func TestItalicAuthorEntityUsesTelegramUTF16Offsets(t *testing.T) {
+	values := url.Values{}
+	addItalicAuthorEntity(values, "(1/2) Иван 🚀\nСообщение", "Иван 🚀")
+	var entities []messageEntity
+	if err := json.Unmarshal([]byte(values.Get("entities")), &entities); err != nil {
+		t.Fatal(err)
+	}
+	if len(entities) != 1 || entities[0].Offset != 6 || entities[0].Length != 7 {
+		t.Fatalf("entities %#v", entities)
+	}
+}

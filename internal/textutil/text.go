@@ -54,7 +54,7 @@ func Render(event model.Event, target model.Platform, unknownQuote string, inclu
 	}
 	var result string
 	if includeAuthor && event.Platform == model.Mattermost && target == model.Telegram {
-		result = strings.TrimRight(event.AuthorName+" : "+body, " :")
+		result = strings.TrimSpace(event.AuthorName + "\n" + body)
 	} else if includeAuthor && event.Platform == model.Telegram && target == model.Mattermost {
 		result = strings.TrimRight(event.AuthorName+": "+body, ": ")
 	} else if includeAuthor {

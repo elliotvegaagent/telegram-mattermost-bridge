@@ -2,10 +2,12 @@ package telegram
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -84,5 +86,37 @@ func TestRunPollingPersistsBeforeOffsetAdvance(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("polling did not stop")
+	}
+}
+
+func TestSendMarksMattermostAuthorAsItalicEntity(t *testing.T) {
+	var received url.Values
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/botsecret/sendMessage" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		received = r.PostForm
+		fmt.Fprint(w, `{"ok":true,"result":{"message_id":77}}`)
+	}))
+	defer server.Close()
+	adapter := New(server.Client(), "secret", server.URL, []config.Route{{ID: "default", TGChatID: -1, MMChannelID: "c"}}, nil, nil)
+	event := model.Event{Platform: model.Mattermost, Kind: model.Message, AuthorName: "Евгений Воропаев", RouteID: "default", Text: "Спасибо"}
+	err := adapter.Send(context.Background(), event, model.DeliveryContext{}, nil, nil, 0, func(model.SentMessage) error { return nil }, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := received.Get("text"); got != "Евгений Воропаев\nСпасибо" {
+		t.Fatalf("text %q", got)
+	}
+	var entities []messageEntity
+	if err := json.Unmarshal([]byte(received.Get("entities")), &entities); err != nil {
+		t.Fatal(err)
+	}
+	if len(entities) != 1 || entities[0].Type != "italic" || entities[0].Offset != 0 || entities[0].Length != 16 {
+		t.Fatalf("entities %#v", entities)
 	}
 }
