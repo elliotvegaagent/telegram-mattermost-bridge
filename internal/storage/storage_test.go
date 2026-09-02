@@ -76,6 +76,24 @@ func TestMessageLinksAndReactionAggregation(t *testing.T) {
 	}
 }
 
+func TestFindByTGPrefersNewestLinkWhenMessageIDWasReused(t *testing.T) {
+	ctx := context.Background()
+	store := newStore(t)
+	oldLink := model.MessageLink{MMPostID: "deleted-root", TGChatID: -100, TGMessageID: "6", MMRootID: "deleted-root", TGAnchorMessageID: "6"}
+	newLink := model.MessageLink{MMPostID: "current-root", TGChatID: -100, TGMessageID: "6", MMRootID: "current-root", TGAnchorMessageID: "6"}
+	if err := store.AddLink(ctx, oldLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddLink(ctx, newLink); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := store.FindByTG(ctx, -100, "6")
+	if err != nil || got == nil || got.MMRootID != "current-root" {
+		t.Fatalf("expected newest link, got %#v, err %v", got, err)
+	}
+}
+
 func TestMigrationsAreIdempotent(t *testing.T) {
 	store := newStore(t)
 	if err := store.Migrate(context.Background()); err != nil {

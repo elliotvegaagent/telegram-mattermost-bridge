@@ -302,7 +302,7 @@ func (s *Store) FindByMMRoot(ctx context.Context, rootID string) (*model.Message
 }
 
 func (s *Store) FindByTG(ctx context.Context, chatID int64, messageID string) (*model.MessageLink, error) {
-	return s.findLink(ctx, "SELECT mm_post_id,tg_chat_id,tg_message_id,mm_root_id,tg_anchor_message_id,part_index FROM message_links WHERE tg_chat_id=? AND tg_message_id=? ORDER BY id LIMIT 1", chatID, messageID)
+	return s.findLink(ctx, "SELECT mm_post_id,tg_chat_id,tg_message_id,mm_root_id,tg_anchor_message_id,part_index FROM message_links WHERE tg_chat_id=? AND tg_message_id=? ORDER BY id DESC LIMIT 1", chatID, messageID)
 }
 
 func (s *Store) findLink(ctx context.Context, query string, args ...any) (*model.MessageLink, error) {
