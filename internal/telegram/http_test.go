@@ -109,14 +109,14 @@ func TestSendMarksMattermostAuthorAsItalicEntity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := received.Get("text"); got != "Евгений Воропаев\nСпасибо" {
+	if got := received.Get("text"); got != "Евгений Воропаев: Спасибо" {
 		t.Fatalf("text %q", got)
 	}
 	var entities []messageEntity
 	if err := json.Unmarshal([]byte(received.Get("entities")), &entities); err != nil {
 		t.Fatal(err)
 	}
-	if len(entities) != 1 || entities[0].Type != "italic" || entities[0].Offset != 0 || entities[0].Length != 16 {
+	if len(entities) != 1 || entities[0].Type != "italic" || entities[0].Offset != 0 || entities[0].Length != 18 {
 		t.Fatalf("entities %#v", entities)
 	}
 }

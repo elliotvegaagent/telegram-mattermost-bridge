@@ -767,13 +767,16 @@ func addItalicAuthorEntity(values url.Values, text, author string) {
 		return
 	}
 	afterAuthor := byteOffset + len(author)
-	if afterAuthor < len(text) && text[afterAuthor] != '\n' {
+	label := author
+	if strings.HasPrefix(text[afterAuthor:], ": ") {
+		label += ": "
+	} else if afterAuthor != len(text) && text[afterAuthor] != '\n' {
 		return
 	}
 	entities := []messageEntity{{
 		Type:   "italic",
 		Offset: len(utf16.Encode([]rune(text[:byteOffset]))),
-		Length: len(utf16.Encode([]rune(author))),
+		Length: len(utf16.Encode([]rune(label))),
 	}}
 	payload, err := json.Marshal(entities)
 	if err == nil {
