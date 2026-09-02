@@ -1,11 +1,8 @@
 .env
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.venv/
-**/__pycache__/
-*.py[cod]
 *.db
-*.db-shm
-*.db-wal
-dist/
+*.db-*
+/bridge
+/dist/
+/.idea/
+/.vscode/
+.DS_Store

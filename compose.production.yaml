@@ -1,0 +1,4 @@
+volumes:
+  bridge_data:
+    external: true
+    name: telegram-mattermost-bridge_bridge_data
