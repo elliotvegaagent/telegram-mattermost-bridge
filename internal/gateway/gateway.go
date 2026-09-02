@@ -126,6 +126,21 @@ func (g *Gateway) deliver(ctx context.Context, job model.OutboxJob) {
 		return
 	}
 
+	if event.Kind == model.Delete {
+		if len(deliveryContext.DeleteTargetIDs) > 0 {
+			if err := target.Delete(ctx, event, deliveryContext.DeleteTargetIDs); err != nil {
+				g.handleDeliveryError(ctx, job, event, err)
+				return
+			}
+		}
+		if err := g.store.CompleteJob(ctx, job.ID, event.EventID); err != nil {
+			g.log.Error("job_complete_failed", "event_id", event.EventID, "error", errType(err))
+			return
+		}
+		g.log.Info("delivery_deleted", "event_id", event.EventID, "target", job.Target)
+		return
+	}
+
 	var avatar *model.MaterializedAttachment
 	avatarLimit := g.maxAttachmentBytes
 	if avatarLimit > 128*1024 {
@@ -184,8 +199,10 @@ func (g *Gateway) handleDeliveryError(ctx context.Context, job model.OutboxJob, 
 			g.log.Error("dead_letter_failed", "event_id", job.EventID, "error", errType(storeErr))
 			return
 		}
-		if noticeErr := g.adapters[event.Platform].SendFailureNotice(ctx, event, deliveryErr.Error()); noticeErr != nil {
-			g.log.Error("failure_notice_failed", "event_id", job.EventID, "error", errType(noticeErr))
+		if event.Kind != model.Delete {
+			if noticeErr := g.adapters[event.Platform].SendFailureNotice(ctx, event, deliveryErr.Error()); noticeErr != nil {
+				g.log.Error("failure_notice_failed", "event_id", job.EventID, "error", errType(noticeErr))
+			}
 		}
 		g.log.Error("delivery_dead_letter", "event_id", job.EventID, "target", job.Target, "error", errType(err))
 		return
@@ -276,6 +293,19 @@ func (g *Gateway) resolveContext(ctx context.Context, event model.Event) (model.
 	}
 	if existing != nil {
 		result.EditTargetID = existing.TGMessageID
+	}
+	if event.Kind == model.Delete {
+		links, err := g.store.FindAllByMM(ctx, event.MessageID)
+		if err != nil {
+			return model.DeliveryContext{}, err
+		}
+		seen := map[string]bool{}
+		for _, link := range links {
+			if link.TGMessageID != "" && !seen[link.TGMessageID] {
+				result.DeleteTargetIDs = append(result.DeleteTargetIDs, link.TGMessageID)
+				seen[link.TGMessageID] = true
+			}
+		}
 	}
 	return result, nil
 }

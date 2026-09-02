@@ -652,6 +652,31 @@ func (a *Adapter) Edit(ctx context.Context, event model.Event, targetID string) 
 	}
 	return a.requestForm(ctx, "editMessageText", values, 20*time.Second, nil)
 }
+func (a *Adapter) Delete(ctx context.Context, event model.Event, targetIDs []string) error {
+	chatID, err := a.chatID(event.RouteID)
+	if err != nil {
+		return err
+	}
+	messageIDs := make([]int64, 0, len(targetIDs))
+	for _, targetID := range targetIDs {
+		messageID, err := strconv.ParseInt(targetID, 10, 64)
+		if err != nil {
+			return model.Permanent("invalid linked Telegram message ID")
+		}
+		messageIDs = append(messageIDs, messageID)
+	}
+	for start := 0; start < len(messageIDs); start += 100 {
+		end := min(start+100, len(messageIDs))
+		payload, err := json.Marshal(messageIDs[start:end])
+		if err != nil {
+			return err
+		}
+		if err := a.requestForm(ctx, "deleteMessages", url.Values{"chat_id": {strconv.FormatInt(chatID, 10)}, "message_ids": {string(payload)}}, 20*time.Second, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (a *Adapter) AcknowledgeDelivery(context.Context, model.Event) error { return nil }
 func (a *Adapter) SyncReactions(ctx context.Context, event model.Event, targetID string, reactions []string) error {
 	chatID, err := a.chatID(event.RouteID)

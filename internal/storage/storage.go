@@ -297,6 +297,23 @@ func (s *Store) FindByMM(ctx context.Context, postID string) (*model.MessageLink
 	return s.findLink(ctx, "SELECT mm_post_id,tg_chat_id,tg_message_id,mm_root_id,tg_anchor_message_id,part_index FROM message_links WHERE mm_post_id=? ORDER BY part_index,id LIMIT 1", postID)
 }
 
+func (s *Store) FindAllByMM(ctx context.Context, postID string) ([]model.MessageLink, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT mm_post_id,tg_chat_id,tg_message_id,mm_root_id,tg_anchor_message_id,part_index FROM message_links WHERE mm_post_id=? ORDER BY part_index,id", postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	links := []model.MessageLink{}
+	for rows.Next() {
+		var link model.MessageLink
+		if err := rows.Scan(&link.MMPostID, &link.TGChatID, &link.TGMessageID, &link.MMRootID, &link.TGAnchorMessageID, &link.PartIndex); err != nil {
+			return nil, err
+		}
+		links = append(links, link)
+	}
+	return links, rows.Err()
+}
+
 func (s *Store) FindByMMRoot(ctx context.Context, rootID string) (*model.MessageLink, error) {
 	return s.findLink(ctx, "SELECT mm_post_id,tg_chat_id,tg_message_id,mm_root_id,tg_anchor_message_id,part_index FROM message_links WHERE mm_root_id=? ORDER BY id LIMIT 1", rootID)
 }

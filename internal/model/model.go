@@ -95,6 +95,7 @@ type DeliveryContext struct {
 	AnchorID          string
 	UnknownReplyQuote string
 	EditTargetID      string
+	DeleteTargetIDs   []string
 }
 
 type SentMessage struct {

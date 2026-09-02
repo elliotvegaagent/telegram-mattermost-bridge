@@ -627,6 +627,14 @@ func (a *Adapter) Edit(ctx context.Context, event model.Event, targetID string) 
 	message := textutil.Render(event, model.Mattermost, "", true)
 	return a.jsonRequest(ctx, http.MethodPut, "/posts/"+targetID+"/patch", nil, map[string]string{"message": message}, nil, 30*time.Second)
 }
+func (a *Adapter) Delete(ctx context.Context, _ model.Event, targetIDs []string) error {
+	for _, targetID := range targetIDs {
+		if err := a.jsonRequest(ctx, http.MethodDelete, "/posts/"+targetID, nil, nil, nil, 30*time.Second); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (a *Adapter) AcknowledgeDelivery(context.Context, model.Event) error { return nil }
 func (a *Adapter) SyncReactions(ctx context.Context, event model.Event, targetID string, reactions []string) error {
 	a.mu.Lock()

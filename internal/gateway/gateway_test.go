@@ -17,14 +17,16 @@ import (
 )
 
 type fakeAdapter struct {
-	mu       sync.Mutex
-	platform model.Platform
-	sends    []model.DeliveryContext
-	edits    []string
-	syncs    []string
-	failures int
-	sendErr  error
-	next     int
+	mu        sync.Mutex
+	platform  model.Platform
+	sends     []model.DeliveryContext
+	edits     []string
+	deletes   []string
+	syncs     []string
+	failures  int
+	sendErr   error
+	deleteErr error
+	next      int
 }
 
 func (f *fakeAdapter) Platform() model.Platform { return f.platform }
@@ -57,6 +59,15 @@ func (f *fakeAdapter) Edit(_ context.Context, _ model.Event, target string) erro
 	f.mu.Unlock()
 	return nil
 }
+func (f *fakeAdapter) Delete(_ context.Context, _ model.Event, targets []string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	f.deletes = append(f.deletes, targets...)
+	return nil
+}
 func (f *fakeAdapter) AcknowledgeDelivery(context.Context, model.Event) error { return nil }
 func (f *fakeAdapter) SyncReactions(_ context.Context, _ model.Event, target string, _ []string) error {
 	f.mu.Lock()
@@ -73,6 +84,11 @@ func (f *fakeAdapter) contextAt(i int) model.DeliveryContext {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.sends[i]
+}
+func (f *fakeAdapter) deleteTargets() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.deletes...)
 }
 
 func setupGateway(t *testing.T) (*Gateway, *storage.Store, *fakeAdapter, *fakeAdapter, context.CancelFunc) {
@@ -165,6 +181,54 @@ func TestGatewayDeadLettersPermanentFailureAndNotifiesSource(t *testing.T) {
 	counts, err := store.Counts(ctx)
 	if err != nil || counts["dead"] != 1 {
 		t.Fatalf("counts %#v %v", counts, err)
+	}
+}
+
+func TestGatewayDoesNotSendDeletionNotification(t *testing.T) {
+	gw, store, tg, _, _ := setupGateway(t)
+	ctx := context.Background()
+	if err := store.AddLink(ctx, model.MessageLink{MMPostID: "mm1", TGChatID: -100, TGMessageID: "10", MMRootID: "mm1", TGAnchorMessageID: "10"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddLink(ctx, model.MessageLink{MMPostID: "mm1", TGChatID: -100, TGMessageID: "11", MMRootID: "mm1", TGAnchorMessageID: "10", PartIndex: 1}); err != nil {
+		t.Fatal(err)
+	}
+	event := model.Event{EventID: "mm:1:delete", Platform: model.Mattermost, Kind: model.Delete, MessageID: "mm1", MessageIDs: []string{"mm1"}, AuthorID: "u", AuthorName: "A", RouteID: "default"}
+	if _, err := gw.Accept(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		counts, err := store.Counts(ctx)
+		return err == nil && counts["completed"] == 1
+	})
+	sends, _, _, _ := tg.counts()
+	if sends != 0 {
+		t.Fatalf("delete produced %d Telegram notification messages", sends)
+	}
+	deleted := tg.deleteTargets()
+	if len(deleted) != 2 || deleted[0] != "10" || deleted[1] != "11" {
+		t.Fatalf("deleted targets %#v", deleted)
+	}
+}
+
+func TestGatewayDoesNotNotifyWhenLinkedDeleteIsRejected(t *testing.T) {
+	gw, store, tg, mm, _ := setupGateway(t)
+	tg.deleteErr = model.Permanent("cannot delete")
+	ctx := context.Background()
+	if err := store.AddLink(ctx, model.MessageLink{MMPostID: "mm1", TGChatID: -100, TGMessageID: "10", MMRootID: "mm1", TGAnchorMessageID: "10"}); err != nil {
+		t.Fatal(err)
+	}
+	event := model.Event{EventID: "mm:2:delete", Platform: model.Mattermost, Kind: model.Delete, MessageID: "mm1", MessageIDs: []string{"mm1"}, RouteID: "default"}
+	if _, err := gw.Accept(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		counts, err := store.Counts(ctx)
+		return err == nil && counts["dead"] == 1
+	})
+	_, _, _, failures := mm.counts()
+	if failures != 0 {
+		t.Fatalf("delete failure produced %d user notifications", failures)
 	}
 }
 

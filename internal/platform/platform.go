@@ -15,6 +15,7 @@ type Adapter interface {
 	Send(context.Context, model.Event, model.DeliveryContext, []model.MaterializedAttachment, []string, int, SentCallback, *model.MaterializedAttachment) error
 	SendFailureNotice(context.Context, model.Event, string) error
 	Edit(context.Context, model.Event, string) error
+	Delete(context.Context, model.Event, []string) error
 	AcknowledgeDelivery(context.Context, model.Event) error
 	SyncReactions(context.Context, model.Event, string, []string) error
 }

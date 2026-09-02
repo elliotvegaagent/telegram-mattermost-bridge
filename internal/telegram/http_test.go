@@ -120,3 +120,29 @@ func TestSendMarksMattermostAuthorAsItalicEntity(t *testing.T) {
 		t.Fatalf("entities %#v", entities)
 	}
 }
+
+func TestDeleteUsesIdempotentBatchForEveryLinkedMessage(t *testing.T) {
+	var deleted []int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/botsecret/deleteMessages" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal([]byte(r.PostForm.Get("message_ids")), &deleted); err != nil {
+			t.Fatal(err)
+		}
+		fmt.Fprint(w, `{"ok":true,"result":true}`)
+	}))
+	defer server.Close()
+	adapter := New(server.Client(), "secret", server.URL, []config.Route{{ID: "default", TGChatID: -1, MMChannelID: "c"}}, nil, nil)
+	event := model.Event{Platform: model.Mattermost, Kind: model.Delete, RouteID: "default"}
+	if err := adapter.Delete(context.Background(), event, []string{"10", "11"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(deleted) != 2 || deleted[0] != 10 || deleted[1] != 11 {
+		t.Fatalf("deleted %#v", deleted)
+	}
+}
