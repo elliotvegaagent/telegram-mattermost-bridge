@@ -164,3 +164,7 @@ can theoretically create one duplicate.
 Editing file attachments, custom or paid emoji, interactive polls, synchronous
 deletion of messages created by other Telegram users, and rebuilding Mattermost
 reaction state from history are outside the current version.
+
+## License
+
+This project is distributed under the [MIT License](LICENSE).
