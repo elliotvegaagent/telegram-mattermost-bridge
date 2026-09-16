@@ -27,13 +27,14 @@ type HealthCallback func(bool)
 type AcceptFunc func(context.Context, model.Event) (bool, error)
 
 type Adapter struct {
-	client       *http.Client
-	methodBase   string
-	fileBase     string
-	chatIDs      map[string]int64
-	routesByChat map[int64]string
-	health       HealthCallback
-	log          *slog.Logger
+	client              *http.Client
+	methodBase          string
+	fileBase            string
+	chatIDs             map[string]int64
+	routesByChat        map[int64]string
+	includeMMToTGAuthor map[string]bool
+	health              HealthCallback
+	log                 *slog.Logger
 }
 
 func New(client *http.Client, token, apiBase string, routes []config.Route, health HealthCallback, logger *slog.Logger) *Adapter {
@@ -47,14 +48,21 @@ func New(client *http.Client, token, apiBase string, routes []config.Route, heal
 		logger = slog.Default()
 	}
 	chatIDs, routesByChat := map[string]int64{}, map[int64]string{}
+	includeMMToTGAuthor := map[string]bool{}
 	for _, route := range routes {
 		chatIDs[route.ID], routesByChat[route.TGChatID] = route.TGChatID, route.ID
+		includeMMToTGAuthor[route.ID] = route.IncludeMMToTGAuthor()
 	}
 	return &Adapter{
 		client: client, methodBase: strings.TrimRight(apiBase, "/") + "/bot" + token,
 		fileBase: strings.TrimRight(apiBase, "/") + "/file/bot" + token,
-		chatIDs:  chatIDs, routesByChat: routesByChat, health: health, log: logger,
+		chatIDs:  chatIDs, routesByChat: routesByChat, includeMMToTGAuthor: includeMMToTGAuthor,
+		health: health, log: logger,
 	}
+}
+
+func (a *Adapter) includeAuthor(event model.Event) bool {
+	return event.Platform != model.Mattermost || a.includeMMToTGAuthor[event.RouteID]
 }
 
 func (a *Adapter) Platform() model.Platform { return model.Telegram }
@@ -559,7 +567,8 @@ func (a *Adapter) Send(ctx context.Context, event model.Event, delivery model.De
 	if err != nil {
 		return err
 	}
-	text := textutil.Render(event, model.Telegram, delivery.UnknownReplyQuote, true)
+	includeAuthor := a.includeAuthor(event)
+	text := textutil.Render(event, model.Telegram, delivery.UnknownReplyQuote, includeAuthor)
 	if len(warnings) > 0 {
 		text += "\n\n⚠️ " + strings.Join(warnings, "; ")
 	}
@@ -598,7 +607,7 @@ func (a *Adapter) Send(ctx context.Context, event model.Event, delivery model.De
 			for key, value := range fields {
 				values.Set(key, value)
 			}
-			if i == 0 && event.Platform == model.Mattermost {
+			if i == 0 && event.Platform == model.Mattermost && includeAuthor {
 				addItalicAuthorEntity(values, item.text, event.AuthorName)
 			}
 			err = a.requestForm(ctx, item.method, values, 40*time.Second, &result)
@@ -642,12 +651,13 @@ func (a *Adapter) Edit(ctx context.Context, event model.Event, targetID string) 
 		return err
 	}
 	event.Kind = model.Message
-	text := textutil.Render(event, model.Telegram, "", true)
+	includeAuthor := a.includeAuthor(event)
+	text := textutil.Render(event, model.Telegram, "", includeAuthor)
 	if len([]rune(text)) > 4096 {
 		return model.Permanent("edited message exceeds Telegram text limit")
 	}
 	values := url.Values{"chat_id": {strconv.FormatInt(chatID, 10)}, "message_id": {targetID}, "text": {text}}
-	if event.Platform == model.Mattermost {
+	if event.Platform == model.Mattermost && includeAuthor {
 		addItalicAuthorEntity(values, text, event.AuthorName)
 	}
 	return a.requestForm(ctx, "editMessageText", values, 20*time.Second, nil)

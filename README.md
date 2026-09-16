@@ -64,6 +64,13 @@ BRIDGE_PAIRS=[{"id":"default","tg_chat_id":-1001111111111,"mm_channel_id":"chann
 ```
 
 Для существующей пары сохраняйте ID `default`, чтобы использовать её checkpoint.
+По умолчанию имя автора Mattermost передаётся в Telegram. Для обезличенного
+направления Mattermost → Telegram укажите для нужной пары
+`"mm_to_tg_author_mode":"hidden"`; обратное направление останется без изменений:
+
+```env
+BRIDGE_PAIRS=[{"id":"default","tg_chat_id":-1001111111111,"mm_channel_id":"channel_a"},{"id":"customer-b","tg_chat_id":-1002222222222,"mm_channel_id":"channel_b","mm_to_tg_author_mode":"hidden"}]
+```
 
 Через `@BotFather` отключите Privacy Mode и заново добавьте бота в группу либо
 сделайте его администратором. Для событий реакций бот должен быть администратором.

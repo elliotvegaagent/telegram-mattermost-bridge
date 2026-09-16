@@ -11,9 +11,19 @@ import (
 )
 
 type Route struct {
-	ID          string `json:"id"`
-	TGChatID    int64  `json:"tg_chat_id"`
-	MMChannelID string `json:"mm_channel_id"`
+	ID               string `json:"id"`
+	TGChatID         int64  `json:"tg_chat_id"`
+	MMChannelID      string `json:"mm_channel_id"`
+	MMToTGAuthorMode string `json:"mm_to_tg_author_mode,omitempty"`
+}
+
+const (
+	MMToTGAuthorName   = "name"
+	MMToTGAuthorHidden = "hidden"
+)
+
+func (r Route) IncludeMMToTGAuthor() bool {
+	return r.MMToTGAuthorMode != MMToTGAuthorHidden
 }
 
 type Settings struct {
@@ -103,8 +113,15 @@ func routesFromEnv() ([]Route, error) {
 	for i, route := range routes {
 		route.ID = strings.TrimSpace(route.ID)
 		route.MMChannelID = strings.TrimSpace(route.MMChannelID)
+		route.MMToTGAuthorMode = strings.ToLower(strings.TrimSpace(route.MMToTGAuthorMode))
+		if route.MMToTGAuthorMode == "" {
+			route.MMToTGAuthorMode = MMToTGAuthorName
+		}
 		if route.ID == "" || route.MMChannelID == "" || route.TGChatID == 0 {
 			return nil, fmt.Errorf("BRIDGE_PAIRS[%d] requires id, tg_chat_id and mm_channel_id", i)
+		}
+		if route.MMToTGAuthorMode != MMToTGAuthorName && route.MMToTGAuthorMode != MMToTGAuthorHidden {
+			return nil, fmt.Errorf("BRIDGE_PAIRS[%d].mm_to_tg_author_mode must be name or hidden", i)
 		}
 		if ids[route.ID] || chats[route.TGChatID] || channels[route.MMChannelID] {
 			return nil, fmt.Errorf("BRIDGE_PAIRS contains duplicate id, Telegram chat or Mattermost channel")

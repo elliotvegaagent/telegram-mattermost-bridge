@@ -121,6 +121,45 @@ func TestSendMarksMattermostAuthorAsItalicEntity(t *testing.T) {
 	}
 }
 
+func TestSendAndEditCanHideMattermostAuthorByRoute(t *testing.T) {
+	received := map[string]url.Values{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/botsecret/sendMessage" && r.URL.Path != "/botsecret/editMessageText" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		received[r.URL.Path] = r.PostForm
+		if r.URL.Path == "/botsecret/sendMessage" {
+			fmt.Fprint(w, `{"ok":true,"result":{"message_id":77}}`)
+			return
+		}
+		fmt.Fprint(w, `{"ok":true,"result":true}`)
+	}))
+	defer server.Close()
+	adapter := New(server.Client(), "secret", server.URL, []config.Route{{
+		ID: "fastdata", TGChatID: -1, MMChannelID: "c", MMToTGAuthorMode: config.MMToTGAuthorHidden,
+	}}, nil, nil)
+	event := model.Event{Platform: model.Mattermost, Kind: model.Message, AuthorName: "Евгений Воропаев", RouteID: "fastdata", Text: "Спасибо"}
+	if err := adapter.Send(context.Background(), event, model.DeliveryContext{}, nil, nil, 0, func(model.SentMessage) error { return nil }, nil); err != nil {
+		t.Fatal(err)
+	}
+	event.Kind = model.Edit
+	if err := adapter.Edit(context.Background(), event, "77"); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/botsecret/sendMessage", "/botsecret/editMessageText"} {
+		if got := received[path].Get("text"); got != "Спасибо" {
+			t.Fatalf("%s text %q", path, got)
+		}
+		if got := received[path].Get("entities"); got != "" {
+			t.Fatalf("%s entities %q", path, got)
+		}
+	}
+}
+
 func TestDeleteUsesIdempotentBatchForEveryLinkedMessage(t *testing.T) {
 	var deleted []int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

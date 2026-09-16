@@ -59,7 +59,7 @@ func Doctor(ctx context.Context, settings config.Settings, store *storage.Store,
 		if _, err := parts.Mattermost.GetChannelMember(ctx, route.ID, mmMe.ID); err != nil {
 			return nil, err
 		}
-		pairs = append(pairs, map[string]any{"id": route.ID, "telegram": map[string]any{"chat_id": chat.ID, "chat_title": firstNonEmpty(chat.Title, chat.Username), "membership": member["status"]}, "mattermost": map[string]any{"channel_id": channel.ID, "channel": firstNonEmpty(channel.DisplayName, channel.Name)}})
+		pairs = append(pairs, map[string]any{"id": route.ID, "mm_to_tg_author_mode": route.MMToTGAuthorMode, "telegram": map[string]any{"chat_id": chat.ID, "chat_title": firstNonEmpty(chat.Title, chat.Username), "membership": member["status"]}, "mattermost": map[string]any{"channel_id": channel.ID, "channel": firstNonEmpty(channel.DisplayName, channel.Name)}})
 	}
 	if err := store.SetState(ctx, "doctor_last_run_ms", strconv.FormatInt(time.Now().UnixMilli(), 10)); err != nil {
 		return nil, err
