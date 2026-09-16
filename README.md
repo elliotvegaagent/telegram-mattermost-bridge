@@ -1,5 +1,7 @@
 # Telegram ↔ Mattermost Bridge на Go
 
+**Русский** | [English](README.en.md)
+
 Самостоятельная Go-реализация двустороннего моста между одной или несколькими
 парами «Telegram-группа ↔ приватный Mattermost-канал». Проект совместим со схемой
 SQLite Python-версии и может продолжить работу с её offset, checkpoint, связями
