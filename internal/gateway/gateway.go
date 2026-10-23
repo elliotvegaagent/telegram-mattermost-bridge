@@ -47,6 +47,9 @@ func (g *Gateway) Accept(ctx context.Context, event model.Event) (bool, error) {
 		return false, err
 	}
 	g.log.Info("event_accepted", "event_id", event.EventID, "source", event.Platform, "kind", event.Kind, "duplicate", !inserted)
+	if inserted && event.Kind == model.Unsupported {
+		g.log.Warn("unsupported_event", "event_id", event.EventID, "route_id", event.RouteID, "message_id", event.MessageID, "content_type", event.ContentType, "reason", event.DiagnosticReason)
+	}
 	return inserted, nil
 }
 

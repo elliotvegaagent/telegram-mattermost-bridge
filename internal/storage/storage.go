@@ -166,7 +166,9 @@ func (s *Store) Enqueue(ctx context.Context, event model.Event) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if inserted && event.Kind != model.Ignored {
+	if inserted && event.Kind == model.Unsupported {
+		_, err = tx.ExecContext(ctx, "UPDATE inbox_events SET status='unsupported',payload_json=NULL,content_type=?,diagnostic_reason=?,route_id=? WHERE event_id=?", event.ContentType, event.DiagnosticReason, event.RouteID, event.EventID)
+	} else if inserted && event.Kind != model.Ignored {
 		_, err = tx.ExecContext(ctx, "INSERT INTO outbox_jobs(event_id,target,state,next_attempt_at_ms,created_at_ms,updated_at_ms) VALUES(?,?,'queued',?,?,?)", event.EventID, event.Platform.Opposite(), timestamp, timestamp, timestamp)
 	} else if inserted {
 		_, err = tx.ExecContext(ctx, "UPDATE inbox_events SET status='completed',payload_json=NULL,completed_at_ms=? WHERE event_id=?", timestamp, event.EventID)

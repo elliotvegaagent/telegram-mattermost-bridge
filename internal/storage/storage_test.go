@@ -2,11 +2,40 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"testing"
 
 	"github.com/elliotvegaagent/telegram-mattermost-bridge/internal/model"
 )
+
+func TestUnsupportedEventKeepsOnlyDiagnostics(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	offset := "52"
+	e := model.Event{EventID: "tg:51:unsupported", Platform: model.Telegram, Kind: model.Unsupported, MessageID: "15", RouteID: "default", Text: "private text", ContentType: "rich_message", DiagnosticReason: "unsupported_rich_message", CheckpointKey: "telegram_offset", CheckpointValue: &offset}
+	for i := 0; i < 2; i++ {
+		inserted, err := s.Enqueue(ctx, e)
+		if err != nil || inserted != (i == 0) {
+			t.Fatalf("enqueue %v %v", inserted, err)
+		}
+	}
+	var status, kind, reason, route string
+	var payload sql.NullString
+	var completed sql.NullInt64
+	if err := s.db.QueryRow("SELECT status,content_type,diagnostic_reason,route_id,payload_json,completed_at_ms FROM inbox_events WHERE event_id=?", e.EventID).Scan(&status, &kind, &reason, &route, &payload, &completed); err != nil {
+		t.Fatal(err)
+	}
+	if status != "unsupported" || kind != "rich_message" || reason != "unsupported_rich_message" || route != "default" || payload.Valid || completed.Valid {
+		t.Fatalf("incorrect diagnostics: %s %s %s %s %#v %#v", status, kind, reason, route, payload, completed)
+	}
+	if job, err := s.FetchDueJob(ctx); err != nil || job != nil {
+		t.Fatal("unsupported event queued for delivery")
+	}
+	if got, err := s.GetState(ctx, "telegram_offset", ""); err != nil || got != "52" {
+		t.Fatal("offset was not persisted")
+	}
+}
 
 func newStore(t *testing.T) *Store {
 	t.Helper()

@@ -200,6 +200,8 @@ type Message struct {
 	Date         int64           `json:"date"`
 	EditDate     int64           `json:"edit_date"`
 	Text         string          `json:"text"`
+	RichMessage  json.RawMessage `json:"rich_message,omitempty"`
+	ContentType  string          `json:"-"`
 	Caption      string          `json:"caption"`
 	MediaGroupID string          `json:"media_group_id"`
 	ReplyTo      *Message        `json:"reply_to_message"`
@@ -420,8 +422,7 @@ func (a *Adapter) eventFromGroup(items []groupedItem, selfUserID int64) model.Ev
 	if sender == nil {
 		sender = &User{}
 	}
-	supported := first.Text != "" || first.Caption != "" || len(first.Photo) > 0 || first.Document != nil || first.Video != nil || first.Audio != nil || first.Voice != nil || first.Animation != nil || len(first.Sticker) > 0 || first.Poll != nil
-	if !routeOK || sender.ID == selfUserID || !supported {
+	if !routeOK || sender.ID == selfUserID || first.ContentType == "service" {
 		id := strconv.FormatInt(first.MessageID, 10)
 		return model.Event{EventID: fmt.Sprintf("tg:ignored:%d:%d", minID, maxID), Platform: model.Telegram, Kind: model.Ignored, MessageID: id, MessageIDs: []string{id}, AuthorID: strconv.FormatInt(sender.ID, 10), AuthorName: "ignored", RouteID: routeOrIgnored(routeID, routeOK), CheckpointKey: "telegram_offset", CheckpointValue: &checkpoint}
 	}
@@ -429,12 +430,23 @@ func (a *Adapter) eventFromGroup(items []groupedItem, selfUserID int64) model.Ev
 	attachments := []model.Attachment{}
 	text := ""
 	for _, item := range items {
+		body, contentErr := item.message.contentText()
+		supported := body != "" || len(item.message.Photo) > 0 || item.message.Document != nil || item.message.Video != nil || item.message.Audio != nil || item.message.Voice != nil || item.message.Animation != nil || len(item.message.Sticker) > 0 || item.message.Poll != nil
+		if contentErr != nil || !supported {
+			reason := "unsupported_content"
+			if contentErr != nil {
+				reason = contentErr.Error()
+			}
+			id := strconv.FormatInt(item.message.MessageID, 10)
+			contentType := item.message.ContentType
+			if contentType == "" {
+				contentType = "unknown"
+			}
+			return model.Event{EventID: fmt.Sprintf("tg:%d:unsupported", item.updateID), Platform: model.Telegram, Kind: model.Unsupported, MessageID: id, MessageIDs: []string{id}, RouteID: routeID, ContentType: contentType, DiagnosticReason: reason, CheckpointKey: "telegram_offset", CheckpointValue: &checkpoint}
+		}
 		messageIDs = append(messageIDs, strconv.FormatInt(item.message.MessageID, 10))
 		if text == "" {
-			text = item.message.Text
-			if text == "" {
-				text = item.message.Caption
-			}
+			text = body
 		}
 		if attachment := attachmentFromMessage(item.message); attachment != nil {
 			attachments = append(attachments, *attachment)
@@ -449,10 +461,7 @@ func (a *Adapter) eventFromGroup(items []groupedItem, selfUserID int64) model.Ev
 	replyID, replyQuote := "", ""
 	if first.ReplyTo != nil {
 		replyID = strconv.FormatInt(first.ReplyTo.MessageID, 10)
-		replyQuote = first.ReplyTo.Text
-		if replyQuote == "" {
-			replyQuote = first.ReplyTo.Caption
-		}
+		replyQuote, _ = first.ReplyTo.contentText()
 		replyQuote = truncateRunes(replyQuote, 240)
 	}
 	eventID := fmt.Sprintf("tg:%d:%s", items[0].updateID, items[0].kind)

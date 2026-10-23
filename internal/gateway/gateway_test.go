@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -14,7 +15,43 @@ import (
 	"github.com/elliotvegaagent/telegram-mattermost-bridge/internal/model"
 	"github.com/elliotvegaagent/telegram-mattermost-bridge/internal/platform"
 	"github.com/elliotvegaagent/telegram-mattermost-bridge/internal/storage"
+	"github.com/elliotvegaagent/telegram-mattermost-bridge/internal/telegram"
 )
+
+func TestRichReplyToRecoveredMessageDeduplicatesAndEdits(t *testing.T) {
+	gw, store, _, mm, _ := setupGateway(t)
+	ctx := context.Background()
+	if err := store.AddLink(ctx, model.MessageLink{MMPostID: "restored", TGChatID: -100, TGMessageID: "15", MMRootID: "restored", TGAnchorMessageID: "15"}); err != nil {
+		t.Fatal(err)
+	}
+	a := telegram.New(nil, "test", "https://example.invalid", []config.Route{{ID: "default", TGChatID: -100, MMChannelID: "c"}}, nil, nil)
+	var u telegram.Update
+	if err := json.Unmarshal([]byte(`{"update_id":60,"message":{"message_id":16,"chat":{"id":-100},"from":{"id":2},"reply_to_message":{"message_id":15},"rich_message":{"blocks":[{"type":"paragraph","text":"Rich reply"}]}}}`), &u); err != nil {
+		t.Fatal(err)
+	}
+	e := a.NormalizeUpdates([]telegram.Update{u}, 99)[0]
+	if _, err := gw.Accept(ctx, e); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { counts, err := store.Counts(ctx); return err == nil && counts["completed"] == 1 })
+	if mm.contextAt(0).RootID != "restored" {
+		t.Fatal("reply lost restored thread")
+	}
+	if inserted, err := gw.Accept(ctx, e); err != nil || inserted {
+		t.Fatal("duplicate accepted")
+	}
+	u.UpdateID = 61
+	u.EditedMessage, u.Message = u.Message, nil
+	e = a.NormalizeUpdates([]telegram.Update{u}, 99)[0]
+	if _, err := gw.Accept(ctx, e); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { counts, err := store.Counts(ctx); return err == nil && counts["completed"] == 2 })
+	sends, edits, _, _ := mm.counts()
+	if sends != 1 || edits != 1 {
+		t.Fatalf("sends=%d edits=%d", sends, edits)
+	}
+}
 
 type fakeAdapter struct {
 	mu        sync.Mutex

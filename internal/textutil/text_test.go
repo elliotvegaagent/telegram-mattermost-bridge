@@ -9,8 +9,8 @@ import (
 )
 
 func TestRenderUsesCompactAuthorFormat(t *testing.T) {
-	mm := model.Event{Platform: model.Mattermost, Kind: model.Message, AuthorName: "Дмитрий Карнаухов", Text: "все понятно"}
-	if got := Render(mm, model.Telegram, "", true); got != "Дмитрий Карнаухов: все понятно" {
+	mm := model.Event{Platform: model.Mattermost, Kind: model.Message, AuthorName: "Иван Петров", Text: "все понятно"}
+	if got := Render(mm, model.Telegram, "", true); got != "Иван Петров: все понятно" {
 		t.Fatalf("unexpected Telegram text: %q", got)
 	}
 	tg := model.Event{Platform: model.Telegram, Kind: model.Message, AuthorName: "Антон", Text: "Спасибо"}

@@ -23,6 +23,8 @@ durable outbox, threads, edits, and reactions stay inside the Gateway.
 - author prefixes such as `Anton: ` are italicized on both platforms, while the
   message continues in regular text on the same line;
 - text, photos, documents, video, audio, voice messages, animations, and Telegram albums;
+- Telegram `rich_message`: text, headings, nested lists, code, quotations, and tables
+  become safe plain text preserving structure, including edits and reply quotes;
 - multiple Mattermost attachments are sent sequentially, with at most five files per post;
 - safe escaping of Mattermost Markdown and all external `@mentions`;
 - silent editing of an already linked text message;
@@ -42,6 +44,19 @@ durable outbox, threads, edits, and reactions stay inside the Gateway.
 Telegram lets a bot place only one reaction on a message, so Telegram shows the
 most recent active reaction. Mattermost keeps every supported reaction at the
 same time; technically, those reactions belong to the bridge bot.
+
+Embedded media in `rich_message` are not supported yet. These messages and unknown
+formats receive an `unsupported` status in `inbox_events`; partial content is not
+delivered. Only identifiers, `route_id`, `content_type`, and `diagnostic_reason`
+are retained; the body is removed. Logs emit `unsupported_event` without content.
+This is a diagnostic status, not a successful delivery or a retry job. Telegram's
+offset advances after diagnostics are persisted so an unknown message cannot
+block subsequent updates. Inspect diagnostics with read-only SQL:
+
+```sql
+SELECT event_id, source_message_id, route_id, content_type, diagnostic_reason
+FROM inbox_events WHERE status = 'unsupported' ORDER BY received_at_ms DESC;
+```
 
 ## Configuration
 

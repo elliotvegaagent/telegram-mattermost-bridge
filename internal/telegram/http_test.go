@@ -104,19 +104,19 @@ func TestSendMarksMattermostAuthorAsItalicEntity(t *testing.T) {
 	}))
 	defer server.Close()
 	adapter := New(server.Client(), "secret", server.URL, []config.Route{{ID: "default", TGChatID: -1, MMChannelID: "c"}}, nil, nil)
-	event := model.Event{Platform: model.Mattermost, Kind: model.Message, AuthorName: "Евгений Воропаев", RouteID: "default", Text: "Спасибо"}
+	event := model.Event{Platform: model.Mattermost, Kind: model.Message, AuthorName: "Иван Петров", RouteID: "default", Text: "Спасибо"}
 	err := adapter.Send(context.Background(), event, model.DeliveryContext{}, nil, nil, 0, func(model.SentMessage) error { return nil }, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := received.Get("text"); got != "Евгений Воропаев: Спасибо" {
+	if got := received.Get("text"); got != "Иван Петров: Спасибо" {
 		t.Fatalf("text %q", got)
 	}
 	var entities []messageEntity
 	if err := json.Unmarshal([]byte(received.Get("entities")), &entities); err != nil {
 		t.Fatal(err)
 	}
-	if len(entities) != 1 || entities[0].Type != "italic" || entities[0].Offset != 0 || entities[0].Length != 18 {
+	if len(entities) != 1 || entities[0].Type != "italic" || entities[0].Offset != 0 || entities[0].Length != 13 {
 		t.Fatalf("entities %#v", entities)
 	}
 }
@@ -140,9 +140,9 @@ func TestSendAndEditCanHideMattermostAuthorByRoute(t *testing.T) {
 	}))
 	defer server.Close()
 	adapter := New(server.Client(), "secret", server.URL, []config.Route{{
-		ID: "fastdata", TGChatID: -1, MMChannelID: "c", MMToTGAuthorMode: config.MMToTGAuthorHidden,
+		ID: "partner-b", TGChatID: -1, MMChannelID: "c", MMToTGAuthorMode: config.MMToTGAuthorHidden,
 	}}, nil, nil)
-	event := model.Event{Platform: model.Mattermost, Kind: model.Message, AuthorName: "Евгений Воропаев", RouteID: "fastdata", Text: "Спасибо"}
+	event := model.Event{Platform: model.Mattermost, Kind: model.Message, AuthorName: "Иван Петров", RouteID: "partner-b", Text: "Спасибо"}
 	if err := adapter.Send(context.Background(), event, model.DeliveryContext{}, nil, nil, 0, func(model.SentMessage) error { return nil }, nil); err != nil {
 		t.Fatal(err)
 	}

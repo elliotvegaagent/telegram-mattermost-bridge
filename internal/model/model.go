@@ -29,6 +29,7 @@ const (
 	ReactionAdded   EventKind = "reaction_added"
 	ReactionRemoved EventKind = "reaction_removed"
 	Ignored         EventKind = "ignored"
+	Unsupported     EventKind = "unsupported"
 )
 
 type Attachment struct {
@@ -47,24 +48,26 @@ type MaterializedAttachment struct {
 }
 
 type Event struct {
-	EventID         string       `json:"event_id"`
-	Platform        Platform     `json:"platform"`
-	Kind            EventKind    `json:"kind"`
-	MessageID       string       `json:"message_id"`
-	MessageIDs      []string     `json:"message_ids"`
-	AuthorID        string       `json:"author_id"`
-	AuthorName      string       `json:"author_name"`
-	RouteID         string       `json:"route_id"`
-	AuthorUsername  string       `json:"author_username,omitempty"`
-	Text            string       `json:"text"`
-	ReplyToID       string       `json:"reply_to_id,omitempty"`
-	ReplyQuote      string       `json:"reply_quote,omitempty"`
-	RootID          string       `json:"root_id,omitempty"`
-	CreatedAtMS     int64        `json:"created_at_ms"`
-	Attachments     []Attachment `json:"attachments"`
-	Reaction        string       `json:"reaction,omitempty"`
-	CheckpointKey   string       `json:"checkpoint_key,omitempty"`
-	CheckpointValue *string      `json:"checkpoint_value,omitempty"`
+	EventID          string       `json:"event_id"`
+	Platform         Platform     `json:"platform"`
+	Kind             EventKind    `json:"kind"`
+	MessageID        string       `json:"message_id"`
+	MessageIDs       []string     `json:"message_ids"`
+	AuthorID         string       `json:"author_id"`
+	AuthorName       string       `json:"author_name"`
+	RouteID          string       `json:"route_id"`
+	AuthorUsername   string       `json:"author_username,omitempty"`
+	Text             string       `json:"text"`
+	ContentType      string       `json:"content_type,omitempty"`
+	DiagnosticReason string       `json:"diagnostic_reason,omitempty"`
+	ReplyToID        string       `json:"reply_to_id,omitempty"`
+	ReplyQuote       string       `json:"reply_quote,omitempty"`
+	RootID           string       `json:"root_id,omitempty"`
+	CreatedAtMS      int64        `json:"created_at_ms"`
+	Attachments      []Attachment `json:"attachments"`
+	Reaction         string       `json:"reaction,omitempty"`
+	CheckpointKey    string       `json:"checkpoint_key,omitempty"`
+	CheckpointValue  *string      `json:"checkpoint_value,omitempty"`
 }
 
 func (e Event) JSON() ([]byte, error) {
